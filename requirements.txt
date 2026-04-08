@@ -1,7 +1,9 @@
-streamlit
+fastapi
+uvicorn
 pandas
+numpy
+scikit-learn
+streamlit
 plotly
 requests
 feedparser
-numpy
-scikit-learn
