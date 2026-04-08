@@ -4,585 +4,1265 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import feedparser
-from datetime import datetime, timedelta
-import re
-import time  # added for delay in sensitivity analysis
+from datetime import datetime
+import time
 
-st.set_page_config(page_title="ZSE PORTFOLIO OPTIMIZER", layout="wide")
+st.set_page_config(
+    page_title="ZSE Portfolio Optimizer",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# ---------------------------
-# CUSTOM CSS WITH YOUR COLOR PALETTE
-# ---------------------------
+# ─────────────────────────────────────────────
+#  DESIGN SYSTEM  — your preferred palette
+# ─────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Your color palette */
-    :root {
-        --ice-gray: #F0F4F8;
-        --heather: #B8C2D0;
-        --greyish: #A8B2C0;
-        --fossil: #8E9AAB;
-        --trout: #6C7A8E;
-        --iron: #4E5B6E;
-        --abalone: #D9E0E8;
-        --thunder: #3A4556;
-        --mink: #5D6A7A;
-    }
-    body, .stApp {
-        background-color: var(--ice-gray);
-    }
-    .main-header {
-        color: var(--thunder);
-        font-size: 2.5rem;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 0.5rem;
-    }
-    .sub-header {
-        color: var(--trout);
-        font-size: 1.2rem;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .card {
-        background-color: white;
-        padding: 1.2rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        margin-bottom: 1.2rem;
-        border-left: 4px solid var(--iron);
-    }
-    .metric-card {
-        background-color: var(--abalone);
-        border-radius: 12px;
-        padding: 1rem;
-        text-align: center;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    }
-    .stButton>button {
-        background-color: var(--iron);
-        color: white;
-        border-radius: 8px;
-        font-weight: 500;
-    }
-    .stButton>button:hover {
-        background-color: var(--thunder);
-    }
-    hr {
-        margin: 1rem 0;
-        border-color: var(--heather);
-    }
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@600;700&display=swap');
+
+:root {
+    --ice-gray:  #F0F4F8;
+    --heather:   #B8C2D0;
+    --greyish:   #A8B2C0;
+    --fossil:    #8E9AAB;
+    --trout:     #6C7A8E;
+    --iron:      #4E5B6E;
+    --abalone:   #D9E0E8;
+    --thunder:   #3A4556;
+    --mink:      #5D6A7A;
+    --white:     #FFFFFF;
+    --success:   #3A7D5B;
+    --danger:    #8B3A3A;
+}
+
+/* ── base ── */
+html, body, .stApp, [data-testid="stAppViewContainer"] {
+    background-color: var(--ice-gray) !important;
+    color: var(--thunder) !important;
+    font-family: 'DM Sans', sans-serif !important;
+}
+[data-testid="stHeader"] { background-color: var(--ice-gray) !important; }
+
+/* ── sidebar ── */
+[data-testid="stSidebar"] {
+    background-color: var(--thunder) !important;
+    border-right: 1px solid var(--iron) !important;
+}
+[data-testid="stSidebar"] * {
+    color: var(--abalone) !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.78rem !important;
+}
+[data-testid="stSidebar"] .stRadio > label {
+    color: var(--heather) !important;
+    font-size: 0.62rem !important;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+[data-testid="stSidebar"] .stRadio label {
+    display: block;
+    padding: 0.5rem 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    transition: background 0.15s;
+    color: var(--heather) !important;
+}
+[data-testid="stSidebar"] .stRadio label:hover {
+    background: rgba(255,255,255,0.08) !important;
+    color: var(--white) !important;
+}
+
+/* ── headings ── */
+h1 {
+    font-family: 'Playfair Display', serif !important;
+    color: var(--thunder) !important;
+    font-size: 1.9rem !important;
+    font-weight: 700 !important;
+}
+h2 {
+    font-family: 'DM Sans', sans-serif !important;
+    color: var(--iron) !important;
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    border-bottom: 1px solid var(--abalone);
+    padding-bottom: 0.35rem;
+    margin-top: 1.6rem !important;
+}
+h3 {
+    font-family: 'DM Sans', sans-serif !important;
+    color: var(--mink) !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+}
+
+/* ── page header ── */
+.page-header {
+    background: var(--white);
+    border: 1px solid var(--abalone);
+    border-radius: 10px;
+    padding: 1.1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.page-header-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--thunder);
+    margin: 0;
+}
+.page-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--trout);
+    background: var(--abalone);
+    border: 1px solid var(--heather);
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+/* ── cards ── */
+.card {
+    background: var(--white);
+    border: 1px solid var(--abalone);
+    border-radius: 10px;
+    padding: 1.3rem 1.5rem;
+    margin-bottom: 1rem;
+}
+.card-accent {
+    background: var(--white);
+    border: 1px solid var(--heather);
+    border-left: 4px solid var(--iron);
+    border-radius: 10px;
+    padding: 1.3rem 1.5rem;
+    margin-bottom: 1rem;
+}
+
+/* ── KPI tiles ── */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 1rem 0 1.6rem;
+}
+.kpi {
+    background: var(--white);
+    border: 1px solid var(--abalone);
+    border-top: 3px solid var(--iron);
+    border-radius: 10px;
+    padding: 1.1rem 1.3rem;
+}
+.kpi-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--fossil);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.4rem;
+}
+.kpi-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--thunder);
+    line-height: 1;
+}
+.kpi-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.67rem;
+    color: var(--fossil);
+    margin-top: 0.3rem;
+}
+
+/* ── badges ── */
+.badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.63rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+.badge-positive { background:#EBF5EE; color:var(--success); border:1px solid #A8D5B5; }
+.badge-negative { background:#F5EBEB; color:var(--danger);  border:1px solid #D5A8A8; }
+.badge-neutral  { background:var(--abalone); color:var(--trout); border:1px solid var(--heather); }
+.badge-iron     { background:var(--abalone); color:var(--iron);  border:1px solid var(--heather); }
+
+/* ── news cards ── */
+.news-item {
+    background: var(--white);
+    border: 1px solid var(--abalone);
+    border-left: 3px solid var(--trout);
+    border-radius: 8px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.8rem;
+}
+.news-headline {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.87rem;
+    font-weight: 600;
+    color: var(--thunder);
+    margin-bottom: 0.25rem;
+}
+.news-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--fossil);
+    margin-bottom: 0.35rem;
+}
+.news-body { font-size: 0.8rem; color: var(--trout); line-height: 1.6; }
+
+/* ── ticker chip ── */
+.ticker {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.71rem;
+    background: var(--abalone);
+    border: 1px solid var(--heather);
+    color: var(--iron);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* ── overline ── */
+.overline {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--fossil);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.35rem;
+}
+
+/* ── guide card ── */
+.guide-card {
+    background: var(--white);
+    border: 1px solid var(--abalone);
+    border-left: 4px solid var(--iron);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    margin-bottom: 1rem;
+}
+
+/* ── Streamlit widget overrides ── */
+.stSelectbox > div > div,
+.stDateInput > div > div {
+    background: var(--white) !important;
+    border: 1px solid var(--heather) !important;
+    border-radius: 6px !important;
+    color: var(--thunder) !important;
+}
+.stButton > button {
+    background: var(--iron) !important;
+    color: var(--white) !important;
+    border: none !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.78rem !important;
+    letter-spacing: 0.05em !important;
+    border-radius: 6px !important;
+    padding: 0.55rem 1.4rem !important;
+    transition: background 0.2s !important;
+}
+.stButton > button:hover { background: var(--thunder) !important; }
+[data-testid="stFileUploader"] {
+    background: var(--white) !important;
+    border: 1px dashed var(--heather) !important;
+    border-radius: 8px !important;
+}
+[data-testid="stMetricValue"] {
+    font-family: 'Playfair Display', serif !important;
+    font-size: 1.5rem !important;
+    color: var(--thunder) !important;
+    font-weight: 700 !important;
+}
+[data-testid="stMetricLabel"] {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.62rem !important;
+    color: var(--fossil) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}
+[data-testid="stMetricDelta"] {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.72rem !important;
+}
+.stDataFrame, [data-testid="stDataFrameResizable"] {
+    background: var(--white) !important;
+    border: 1px solid var(--abalone) !important;
+    border-radius: 8px !important;
+}
+.stProgress > div > div { background: var(--iron) !important; }
+.streamlit-expanderHeader {
+    background: var(--white) !important;
+    border: 1px solid var(--abalone) !important;
+    border-radius: 6px !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.78rem !important;
+    color: var(--iron) !important;
+}
+hr { border-color: var(--abalone) !important; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--ice-gray); }
+::-webkit-scrollbar-thumb { background: var(--heather); border-radius: 3px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------
-# Helper functions
-# ---------------------------
+
+# ─────────────────────────────────────────────
+#  PLOTLY THEME HELPER
+#  Accepts extra kwargs (e.g. yaxis2=...) safely
+# ─────────────────────────────────────────────
+def make_plot_layout(**extra):
+    base = dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#FFFFFF",
+        font=dict(family="DM Mono, monospace", color="#6C7A8E", size=11),
+        xaxis=dict(
+            gridcolor="#D9E0E8", linecolor="#B8C2D0",
+            tickcolor="#B8C2D0", tickfont=dict(color="#8E9AAB")
+        ),
+        yaxis=dict(
+            gridcolor="#D9E0E8", linecolor="#B8C2D0",
+            tickcolor="#B8C2D0", tickfont=dict(color="#8E9AAB")
+        ),
+        colorway=["#4E5B6E","#8E9AAB","#3A7D5B","#8B3A3A","#6C7A8E","#B8C2D0"],
+        hoverlabel=dict(
+            bgcolor="#FFFFFF", bordercolor="#B8C2D0", font_color="#3A4556"
+        ),
+        margin=dict(l=12, r=12, t=40, b=12),
+        legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="#D9E0E8"),
+    )
+    base.update(extra)   # safely merge yaxis2 or any other key
+    return base
+
+
+# ─────────────────────────────────────────────
+#  API HELPER  — retry on 429
+# ─────────────────────────────────────────────
+API_URL = "https://zse-ai-backend.onrender.com/api/optimize"
+
+def get_portfolio_data(tau, risk, date, retries=2, delay=8):
+    payload = {"tau": tau, "risk_aversion": risk, "selected_date": date}
+    for attempt in range(retries + 1):
+        try:
+            resp = requests.post(API_URL, json=payload, timeout=40)
+            if resp.status_code == 429:
+                if attempt < retries:
+                    st.warning(
+                        f"Rate limit reached — retrying in {delay}s "
+                        f"(attempt {attempt+1}/{retries})…"
+                    )
+                    time.sleep(delay)
+                    continue
+                st.error(
+                    "API rate limit reached. Wait a moment and try again."
+                )
+                return None
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.Timeout:
+            st.error(
+                "Request timed out. The server may be starting up "
+                "— please try again in 30 seconds."
+            )
+            return None
+        except Exception as e:
+            if attempt < retries:
+                time.sleep(delay)
+                continue
+            st.error(f"API error: {e}")
+            return None
+    return None
+
+
+# ─────────────────────────────────────────────
+#  DATA HELPERS
+# ─────────────────────────────────────────────
 @st.cache_data
 def load_csv(file, parse_dates=None):
     try:
         return pd.read_csv(file, parse_dates=parse_dates)
     except FileNotFoundError:
-        st.warning(f"File not found: {file}")
         return pd.DataFrame()
 
-def wide_to_long(df, id_vars='Date', value_name='price'):
+def wide_to_long(df, id_vars="Date", value_name="price"):
     if df.empty:
         return df
-    return df.melt(id_vars=id_vars, var_name='ticker', value_name=value_name)
+    return df.melt(id_vars=id_vars, var_name="ticker", value_name=value_name)
 
 def fetch_rss_feed(url):
-    """Fetch RSS feed, keep only articles from 2025+ and about the 9 companies."""
+    keywords = [
+        "AFDIS","African Distillers","BAT","British American Tobacco",
+        "CAFCA","Cafca","CBZ","CBZ Holdings","DLTA","Delta","DZL",
+        "Dairibord","ECO","Econet","OKZ","OK Zimbabwe","SEED","Seed Co"
+    ]
     try:
         feed = feedparser.parse(url)
         entries = []
-        keywords = [
-            'AFDIS', 'African Distillers', 'BAT', 'British American Tobacco', 'CAFCA', 'Cafca',
-            'CBZ', 'CBZ Holdings', 'DLTA', 'Delta', 'DZL', 'Dairibord', 'ECO', 'Econet',
-            'OKZ', 'OK Zimbabwe', 'SEED', 'Seed Co'
-        ]
-        for entry in feed.entries[:40]:
-            pub_date = entry.get('published', '')
-            year = 0
-            try:
-                # Try common RSS date format
-                dt = datetime.strptime(pub_date, '%a, %d %b %Y %H:%M:%S %z')
-                year = dt.year
-            except:
-                match = re.search(r'(\d{4})', pub_date)
-                year = int(match.group(1)) if match else 0
-            if year < 2025:
-                continue
-            title = entry.title.lower()
-            summary = entry.get('summary', '').lower()
-            if any(keyword.lower() in title or keyword.lower() in summary for keyword in keywords):
+        for entry in feed.entries[:30]:
+            title   = entry.title.lower()
+            summary = entry.get("summary", "").lower()
+            if any(k.lower() in title or k.lower() in summary for k in keywords):
+                raw = entry.get("summary", "")
                 entries.append({
-                    'title': entry.title,
-                    'link': entry.link,
-                    'published': pub_date,
-                    'summary': entry.get('summary', '')[:350] + '...' if len(entry.get('summary', '')) > 350 else entry.get('summary', '')
+                    "title":     entry.title,
+                    "link":      entry.link,
+                    "published": entry.get("published", "—"),
+                    "summary":   (raw[:280] + "…") if len(raw) > 280 else raw,
                 })
         return entries
-    except Exception as e:
-        st.error(f"RSS feed error: {e}")
+    except Exception:
         return []
 
-# ---------------------------
-# Load default data
-# ---------------------------
+
+# ─────────────────────────────────────────────
+#  LOAD DEFAULT DATA
+# ─────────────────────────────────────────────
 @st.cache_data
 def load_default_data():
-    news_df = load_csv("news_sentiment_clean.csv", parse_dates=['date'])
-    prices_wide = load_csv("prices_9stocks.csv", parse_dates=['Date'])
+    news_df     = load_csv("news_sentiment_clean.csv", parse_dates=["date"])
+    prices_wide = load_csv("prices_9stocks.csv", parse_dates=["Date"])
     prices_long = wide_to_long(prices_wide) if not prices_wide.empty else pd.DataFrame()
-    fund_df = load_csv("fundamentals_9stocks.csv")
+    fund_df     = load_csv("fundamentals_9stocks.csv")
     if not fund_df.empty:
         fund_df.rename(columns={
-            'pb_ratio': 'P/B', 'roi': 'ROE', 'net_margin': 'Net Margin',
-            'div_yield': 'Dividend Yield', 'market_cap_zig_millions': 'Market Cap (ZiG mn)',
-            'pe_ratio': 'P/E'
+            "pb_ratio":"P/B","roi":"ROE","net_margin":"Net Margin",
+            "div_yield":"Dividend Yield",
+            "market_cap_zig_millions":"Market Cap (ZiG mn)",
+            "pe_ratio":"P/E",
         }, inplace=True)
-    forecast_df = load_csv("forecasts_9stocks.csv", parse_dates=['date'])
+    forecast_df = load_csv("forecasts_9stocks.csv", parse_dates=["date"])
     return news_df, prices_long, fund_df, forecast_df
 
-# Initialize session state
-if 'news_df' not in st.session_state:
-    news_df, prices_long, fund_df, forecast_df = load_default_data()
-    st.session_state.news_df = news_df
-    st.session_state.prices_long = prices_long
-    st.session_state.fund_df = fund_df
-    st.session_state.forecast_df = forecast_df
-else:
-    news_df = st.session_state.news_df
-    prices_long = st.session_state.prices_long
-    fund_df = st.session_state.fund_df
-    forecast_df = st.session_state.forecast_df
+for key, val in zip(
+    ["news_df","prices_long","fund_df","forecast_df"],
+    load_default_data()
+):
+    if key not in st.session_state:
+        st.session_state[key] = val
 
-API_URL = "https://zse-ai-backend.onrender.com/api/optimize"
+news_df     = st.session_state.news_df
+prices_long = st.session_state.prices_long
+fund_df     = st.session_state.fund_df
+forecast_df = st.session_state.forecast_df
 
-def get_portfolio_data(tau, risk, date):
-    payload = {"tau": tau, "risk_aversion": risk, "selected_date": date}
-    try:
-        response = requests.post(API_URL, json=payload, timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        st.error(f"API error: {e}")
-        return None
 
-# ---------------------------
-# Sidebar navigation
-# ---------------------------
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["🏠 Home", "📘 User Guide", "📊 Market Intelligence", "⚙️ Portfolio Optimizer", "📈 Stock Analysis", "📰 Live News Feed"])
+# ─────────────────────────────────────────────
+#  SIDEBAR
+# ─────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style='padding:1.2rem 0.8rem 1rem;
+                border-bottom:1px solid rgba(255,255,255,0.1);
+                margin-bottom:1rem'>
+        <div style='font-family:Playfair Display,serif;
+                    font-size:1.1rem;font-weight:700;
+                    color:#F0F4F8;letter-spacing:-0.01em'>
+            ZSE Portfolio
+        </div>
+        <div style='font-family:DM Mono,monospace;
+                    font-size:0.58rem;color:#8E9AAB;
+                    letter-spacing:0.1em;margin-top:3px'>
+            AI · Black-Litterman · ZSE
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# ---------------------------
-# Page 0: Home (user personas)
-# ---------------------------
+    page = st.radio(
+        "NAVIGATE",
+        ["🏠 Home",
+         "📊 Market Intelligence",
+         "⚙️ Portfolio Optimizer",
+         "📈 Stock Analysis",
+         "📰 Live News Feed",
+         "📘 User Guide"],
+        label_visibility="visible"
+    )
+
+    st.markdown("---")
+    st.markdown("""
+    <div style='font-family:DM Mono,monospace;font-size:0.62rem;
+                color:#8E9AAB;line-height:2;padding:0.5rem 0'>
+        DA-BERT Accuracy &nbsp;<span style='color:#D9E0E8'>81.4%</span><br>
+        Sharpe Ratio &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style='color:#D9E0E8'>0.79</span><br>
+        USD Preserved &nbsp;&nbsp;&nbsp;<span style='color:#A8D5B5'>76.6%</span><br>
+        Outperformance &nbsp;<span style='color:#A8D5B5'>+20.4%</span><br>
+        Test Period &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style='color:#8E9AAB'>2023–2024</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+#  PAGE 0  —  HOME
+# ─────────────────────────────────────────────
 if page == "🏠 Home":
-    st.markdown('<div class="main-header">ZSE PORTFOLIO OPTIMIZER</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">AI‑Driven Black‑Litterman Optimization for Zimbabwe Stock Exchange</div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div style="background-color: var(--abalone); padding: 1rem; border-radius: 16px; margin-bottom: 2rem; text-align: center;">
-        <p>Welcome to the AI‑powered portfolio optimization system. Use the sidebar to explore sentiment analysis,
-        run portfolio optimisation, analyse individual stocks, and follow live news.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.subheader("Who can benefit from this system?")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-        <div class="card">
-            <h3>📈 Investors</h3>
-            <p>See how AI sentiment forecasts translate into portfolio recommendations. Understand which stocks are overweight or underweight and why.</p>
-            <p><strong>➡️ Start on <em>Market Intelligence</em> to gauge overall sentiment, then go to <em>Portfolio Optimizer</em> for the AI‑BL weights.</strong></p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("""
-        <div class="card">
-            <h3>📊 Analysts</h3>
-            <p>Drill into individual stocks: fundamentals, AI signals, price vs sentiment correlation, and forecast accuracy. Validate the CNN‑LSTM predictions.</p>
-            <p><strong>➡️ Use <em>Stock Analysis</em> to explore any ticker in depth.</strong></p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown("""
-        <div class="card">
-            <h3>🏦 Portfolio Managers</h3>
-            <p>Adjust τ (confidence in AI) and δ (risk aversion) to see how the optimal portfolio changes. The sensitivity analysis shows how weights shift with τ.</p>
-            <p><strong>➡️ Go to <em>Portfolio Optimizer</em> and run the τ sensitivity chart.</strong></p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("""
-        <div class="card">
-            <h3>📰 Stockbrokers & Advisors</h3>
-            <p>Stay ahead with live news feeds filtered for the 9 ZSE companies. Explain to clients why sentiment drives our recommendations.</p>
-            <p><strong>➡️ Check <em>Live News Feed</em> for the latest updates from 2025 onwards.</strong></p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with st.expander("📌 About the system"):
-        st.markdown("""
-        - **Sentiment**: Domain‑adapted BERT fine‑tuned on 8,465 Zimbabwean news articles (81.4% accuracy).  
-        - **Forecasts**: CNN‑LSTM trained on historical prices and sentiment scores.  
-        - **Optimisation**: Black‑Litterman Bayesian fusion (market equilibrium + AI views).  
-        - **Backtest (2023‑2024)**: AI‑BL portfolio outperformed equal‑weight by 20.4% and preserved 76.6% of USD value during currency collapse.  
-        - **Live backend**: API deployed on Render returns weights in real time.
-        """)
 
-# ---------------------------
-# Page 1: User Guide
-# ---------------------------
-elif page == "📘 User Guide":
-    st.header("User Guide")
     st.markdown("""
-    <div class="card">
-        <h3>📊 Market Intelligence</h3>
-        <p>Select a date, view sentiment gauges, bar chart, sentiment change, and expand news articles. You can upload your own CSV to replace the news data.</p>
-    </div>
-    <div class="card">
-        <h3>⚙️ Portfolio Optimizer</h3>
-        <p>Adjust τ (AI confidence) and δ (risk aversion), then run optimization. The τ sensitivity chart shows how weights shift with AI confidence. The currency simulator shows wealth preservation during hyperinflation.</p>
-    </div>
-    <div class="card">
-        <h3>📈 Stock Analysis</h3>
-        <p>Select a stock and date to see fundamentals, AI signals, price vs sentiment chart, and forecast vs actual returns.</p>
-    </div>
-    <div class="card">
-        <h3>📰 Live News Feed</h3>
-        <p>Fetches RSS news, keeps only articles from 2025 onwards that mention any of the 9 companies. You can provide a custom RSS URL.</p>
-    </div>
-    <div class="card">
-        <h3>💾 Upload Your Own Data</h3>
-        <p>On the Market Intelligence page, upload a new news CSV. The dashboard will immediately use it for sentiment analysis.</p>
+    <div style='padding:1.8rem 0 0.8rem'>
+        <div style='font-family:DM Mono,monospace;font-size:0.62rem;
+                    color:#8E9AAB;letter-spacing:0.18em;
+                    text-transform:uppercase;margin-bottom:0.5rem'>
+            Harare Institute of Technology · Financial Engineering · 2026
+        </div>
+        <div style='font-family:Playfair Display,serif;font-size:2.5rem;
+                    font-weight:700;color:#3A4556;
+                    letter-spacing:-0.02em;line-height:1.15'>
+            AI-Driven Portfolio<br>
+            <span style='color:#4E5B6E'>Optimization for ZSE</span>
+        </div>
+        <p style='color:#6C7A8E;font-size:0.92rem;
+                  margin-top:0.9rem;max-width:540px;line-height:1.75'>
+            Domain-adapted BERT sentiment analysis combined with CNN-LSTM
+            return forecasting and Black-Litterman Bayesian optimization —
+            first applied to the Zimbabwe Stock Exchange frontier market.
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
-# ---------------------------
-# Page 2: Market Intelligence
-# ---------------------------
+    st.markdown("""
+    <div class='kpi-grid'>
+        <div class='kpi'>
+            <div class='kpi-label'>Outperformance</div>
+            <div class='kpi-value'>+20.4%</div>
+            <div class='kpi-sub'>vs equal-weight benchmark</div>
+        </div>
+        <div class='kpi'>
+            <div class='kpi-label'>USD Wealth Preserved</div>
+            <div class='kpi-value'>76.6%</div>
+            <div class='kpi-sub'>during ZWL → ZiG collapse</div>
+        </div>
+        <div class='kpi'>
+            <div class='kpi-label'>Sharpe Ratio</div>
+            <div class='kpi-value'>0.79</div>
+            <div class='kpi-sub'>AI-BL portfolio · β = 0.084</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    features = [
+        ("01","Market Intelligence",
+         "DA-BERT sentiment scores from Zimbabwean financial news. "
+         "Upload new data and the system adapts in real time."),
+        ("02","Portfolio Optimizer",
+         "Adjust τ (AI confidence) and δ (risk aversion). "
+         "The live Black-Litterman API returns optimal weights instantly."),
+        ("03","Stock Deep Dive",
+         "Fundamentals, AI signals, price-sentiment correlation, "
+         "CNN-LSTM forecast vs actual returns."),
+        ("04","τ Sensitivity",
+         "See how portfolio weights shift as you increase trust "
+         "in AI views over market equilibrium."),
+        ("05","Currency Simulator",
+         "Model wealth preservation across all three portfolios "
+         "during Zimbabwe's currency collapse."),
+        ("06","Live News Feed",
+         "RSS-filtered headlines from The Herald and custom sources, "
+         "matched to your 9 holdings automatically."),
+    ]
+    for i, (num, title, desc) in enumerate(features):
+        with [col1, col2, col3][i % 3]:
+            st.markdown(f"""
+            <div class='card-accent' style='min-height:118px'>
+                <div style='font-family:DM Mono,monospace;font-size:0.58rem;
+                            color:#A8B2C0;margin-bottom:0.45rem'>{num}</div>
+                <div style='font-family:DM Sans,sans-serif;font-size:0.88rem;
+                            font-weight:600;color:#3A4556;
+                            margin-bottom:0.35rem'>{title}</div>
+                <div style='font-size:0.78rem;color:#6C7A8E;
+                            line-height:1.6'>{desc}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("""
+    <div style='font-family:DM Mono,monospace;font-size:0.61rem;
+                color:#A8B2C0;text-align:center;padding:0.4rem 0'>
+        Department of Financial Engineering · School of Business and Management Sciences
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+#  PAGE 1  —  MARKET INTELLIGENCE
+# ─────────────────────────────────────────────
 elif page == "📊 Market Intelligence":
-    st.header("Market Intelligence")
-    
-    uploaded_file = st.file_uploader("Upload new news CSV (optional)", type=["csv"])
-    if uploaded_file is not None:
+
+    st.markdown("""
+    <div class='page-header'>
+        <span class='page-header-title'>Market Intelligence</span>
+        <span class='page-tag'>DA-BERT Sentiment</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    uploaded = st.file_uploader(
+        "Upload new news CSV to override default data (optional)",
+        type=["csv"]
+    )
+    if uploaded is not None:
         try:
-            new_news = pd.read_csv(uploaded_file, parse_dates=['date'])
-            st.session_state.news_df = new_news
-            news_df = new_news
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Articles in uploaded data", len(new_news))
-            with col2:
-                st.metric("Date range", f"{new_news['date'].min().date()} to {new_news['date'].max().date()}")
-            st.success("News data updated! All charts now reflect the new data.")
+            new_df = pd.read_csv(uploaded, parse_dates=["date"])
+            st.session_state.news_df = new_df
+            news_df = new_df
+            ca, cb = st.columns(2)
+            ca.metric("Articles loaded", len(new_df))
+            cb.metric(
+                "Date range",
+                f"{new_df['date'].min().date()} → {new_df['date'].max().date()}"
+            )
+            st.success(
+                "Dataset updated — all charts below now reflect your uploaded data."
+            )
         except Exception as e:
-            st.error(f"Error loading file: {e}")
-    
+            st.error(
+                f"Could not parse file: {e}. "
+                "Required columns: date, ticker, headline, content, "
+                "sentiment_score, sentiment_label, source."
+            )
+
     if news_df.empty:
-        st.error("No news data available. Please upload a CSV file.")
+        st.warning("No news data found. Upload a CSV above.")
         st.stop()
-    
-    all_dates = sorted(news_df["date"].unique())
-    selected_date = st.selectbox("Select a date (only dates with news)", all_dates)
-    daily_news = news_df[news_df["date"] == selected_date]
-    
+
+    all_dates     = sorted(news_df["date"].unique())
+    selected_date = st.selectbox(
+        "Select trading date (only dates with news shown)", all_dates
+    )
+    daily_news    = news_df[news_df["date"] == selected_date]
+
     if not daily_news.empty:
-        avg_sentiment = daily_news["sentiment_score"].mean()
-        max_sent = daily_news["sentiment_score"].max()
-        min_sent = daily_news["sentiment_score"].min()
-        sentiment_vol = (max_sent - min_sent) / 2
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Average Sentiment", f"{avg_sentiment:.3f}")
-            norm = (avg_sentiment + 1) / 2
-            st.progress(norm)
-        with col2:
-            st.metric("Sentiment Volatility", f"{sentiment_vol:.3f}")
-        
-        daily_avg_ticker = daily_news.groupby("ticker")["sentiment_score"].mean().reset_index()
-        fig_bar = px.bar(daily_avg_ticker, x="ticker", y="sentiment_score", title="Sentiment by Stock")
-        fig_bar.update_layout(xaxis_tickangle=-45)
+        avg_s   = daily_news["sentiment_score"].mean()
+        vol_s   = (daily_news["sentiment_score"].max() -
+                   daily_news["sentiment_score"].min()) / 2
+        pct_pos = (daily_news["sentiment_score"] > 0.1).mean() * 100
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Average Sentiment",  f"{avg_s:.3f}")
+        c2.metric("Sentiment Spread",   f"{vol_s:.3f}")
+        c3.metric("% Positive Articles", f"{pct_pos:.0f}%")
+        st.progress(float((avg_s + 1) / 2))
+
+        ticker_avg = (
+            daily_news.groupby("ticker")["sentiment_score"]
+            .mean().reset_index()
+        )
+        bar_colors = [
+            "#3A7D5B" if v > 0.1 else ("#8B3A3A" if v < -0.1 else "#4E5B6E")
+            for v in ticker_avg["sentiment_score"]
+        ]
+        fig_bar = go.Figure(go.Bar(
+            x=ticker_avg["ticker"],
+            y=ticker_avg["sentiment_score"],
+            marker_color=bar_colors,
+            text=ticker_avg["sentiment_score"].round(3),
+            textposition="outside",
+            textfont=dict(family="DM Mono", size=10, color="#6C7A8E"),
+        ))
+        fig_bar.add_hline(y=0, line_color="#B8C2D0", line_width=1)
+        fig_bar.update_layout(
+            title=dict(text="Sentiment Score by Stock",
+                       font=dict(family="DM Sans", size=14, color="#3A4556")),
+            showlegend=False,
+            **make_plot_layout()
+        )
         st.plotly_chart(fig_bar, use_container_width=True)
     else:
         st.warning("No sentiment data for selected date.")
-    
-    sentiment_over_time = news_df.groupby("date")["sentiment_score"].mean().reset_index()
-    fig_line = px.line(sentiment_over_time, x="date", y="sentiment_score", title="Market Sentiment Trend")
+
+    trend = news_df.groupby("date")["sentiment_score"].mean().reset_index()
+    fig_line = go.Figure(go.Scatter(
+        x=trend["date"], y=trend["sentiment_score"],
+        mode="lines",
+        line=dict(color="#4E5B6E", width=1.8),
+        fill="tozeroy", fillcolor="rgba(78,91,110,0.08)",
+    ))
+    fig_line.update_layout(
+        title=dict(text="Market Sentiment Trend",
+                   font=dict(family="DM Sans", size=14, color="#3A4556")),
+        **make_plot_layout()
+    )
     st.plotly_chart(fig_line, use_container_width=True)
-    
-    st.subheader("Sentiment Change (vs previous date with news)")
+
     prev_dates = [d for d in all_dates if d < selected_date]
     if prev_dates:
         prev_date = max(prev_dates)
-        current_sent = news_df[news_df["date"] == selected_date].groupby("ticker")["sentiment_score"].mean().reset_index()
-        prev_sent = news_df[news_df["date"] == prev_date].groupby("ticker")["sentiment_score"].mean().reset_index()
-        merged = current_sent.merge(prev_sent, on="ticker", suffixes=("_current", "_prev"))
-        merged["change"] = merged["sentiment_score_current"] - merged["sentiment_score_prev"]
-        merged["trend"] = merged["change"].apply(
-            lambda x: "▲ Strongly Improving" if x > 0.05 else ("▲ Improving" if x > 0 else ("▼ Strongly Declining" if x < -0.05 else ("▼ Declining" if x < 0 else "● Stable")))
+        curr_s = (news_df[news_df["date"] == selected_date]
+                  .groupby("ticker")["sentiment_score"].mean().reset_index())
+        prev_s = (news_df[news_df["date"] == prev_date]
+                  .groupby("ticker")["sentiment_score"].mean().reset_index())
+        merged = curr_s.merge(prev_s, on="ticker", suffixes=("_now","_prev"))
+        merged["Δ"] = (merged["sentiment_score_now"] -
+                       merged["sentiment_score_prev"]).round(4)
+        merged["Trend"] = merged["Δ"].apply(
+            lambda x: "▲ Improving"  if x >  0.05 else
+                      "▲ Slight ↑"   if x >  0    else
+                      "▼ Declining"  if x < -0.05 else "▼ Slight ↓"
         )
-        st.dataframe(merged[["ticker", "sentiment_score_current", "sentiment_score_prev", "change", "trend"]])
+        st.markdown("<h2>Sentiment Change vs Previous Date</h2>",
+                    unsafe_allow_html=True)
+        st.dataframe(
+            merged.rename(columns={
+                "ticker":"Ticker",
+                "sentiment_score_now":"Current",
+                "sentiment_score_prev":"Previous",
+            })[["Ticker","Current","Previous","Δ","Trend"]],
+            use_container_width=True,
+        )
     else:
         st.info("No previous date available for comparison.")
-    
-    st.subheader(f"News Articles on {selected_date.date()}")
+
+    st.markdown(
+        f"<h2>News Articles — {str(selected_date)[:10]}</h2>",
+        unsafe_allow_html=True
+    )
     news_today = news_df[news_df["date"] == selected_date]
     if not news_today.empty:
         for _, row in news_today.iterrows():
-            with st.expander(f"{row['headline']} ({row['source']})"):
-                st.write(row["content"])
-                st.caption(f"Sentiment: {row.get('sentiment_label', 'N/A')} | Score: {row.get('sentiment_score', 'N/A'):.3f} | Confidence: {row.get('confidence', 'N/A')}")
+            lbl = str(row.get("sentiment_label","neutral")).lower()
+            badge_cls = (
+                "badge-positive" if lbl == "positive" else
+                "badge-negative" if lbl == "negative" else
+                "badge-neutral"
+            )
+            try:
+                score_str = f"{float(row.get('sentiment_score',0)):.3f}"
+            except Exception:
+                score_str = str(row.get("sentiment_score",""))
+            st.markdown(f"""
+            <div class='news-item'>
+                <div style='display:flex;justify-content:space-between;
+                            align-items:flex-start;margin-bottom:0.3rem'>
+                    <span class='ticker'>{row.get("ticker","—")}</span>
+                    <span class='badge {badge_cls}'>
+                        {lbl.upper()} · {score_str}
+                    </span>
+                </div>
+                <div class='news-headline'>{row.get("headline","No headline")}</div>
+                <div class='news-meta'>
+                    {str(row.get("source","")).upper()} · {str(row.get("date",""))[:10]}
+                </div>
+                <div class='news-body'>{row.get("content","")}</div>
+            </div>
+            """, unsafe_allow_html=True)
     else:
-        st.info("No news articles for this date.")
+        st.info("No articles for this date.")
 
-# ---------------------------
-# Page 3: Portfolio Optimizer (dynamic date, τ sensitivity with delay)
-# ---------------------------
+
+# ─────────────────────────────────────────────
+#  PAGE 2  —  PORTFOLIO OPTIMIZER
+# ─────────────────────────────────────────────
 elif page == "⚙️ Portfolio Optimizer":
-    st.header("Portfolio Optimizer")
-    
-    if not forecast_df.empty:
-        available_dates = sorted(forecast_df['date'].dt.strftime('%Y-%m-%d').unique())
-        selected_date = st.selectbox(
-            "Select optimization date", 
-            available_dates,
-            index=len(available_dates)//2 if available_dates else 0
-        )
-    else:
-        selected_date = "2023-06-15"
-        st.warning("Forecast data not available, using default date.")
-    
-    tau = st.sidebar.slider("τ (AI Confidence)", 0.01, 0.10, 0.025, 0.005)
-    risk = st.sidebar.slider("δ (Risk Aversion)", 1.0, 5.0, 2.5, 0.1)
-    
-    if st.button("Run Optimization", type="primary"):
-        with st.spinner("Calling Black‑Litterman API..."):
-            data = get_portfolio_data(tau, risk, selected_date)
-        
-        if data:
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                st.subheader("Portfolio Allocation")
-                df_weights = pd.DataFrame({
-                    "Ticker": data["tickers"],
-                    "Weight %": data["weights_percent"],
-                    "Posterior Return": data["posterior_returns"],
-                    "AI View": data["ai_views"],
-                    "Equilibrium Return": data["equilibrium_returns"]
-                }).sort_values("Weight %", ascending=False)
-                fig = px.bar(df_weights, x="Ticker", y="Weight %", title=f"Optimal Weights (τ={tau:.3f}, δ={risk:.1f})")
-                fig.update_layout(xaxis_tickangle=-45)
-                st.plotly_chart(fig, use_container_width=True)
-                st.subheader("Weights Table")
-                st.dataframe(df_weights)
-                
-                # Interactive explanation (dropdown)
-                st.subheader("📋 Explain a Stock's Weight")
-                explain_ticker = st.selectbox("Select a ticker to see why it is overweight or underweight", df_weights["Ticker"].tolist())
-                if explain_ticker:
-                    row = df_weights[df_weights["Ticker"] == explain_ticker].iloc[0]
-                    eq_weight_pct = 100 / len(df_weights)
-                    diff = row["Weight %"] - eq_weight_pct
-                    status = "OVERWEIGHT" if diff > 0 else "UNDERWEIGHT"
-                    st.markdown(f"""
-                    <div style="background-color: var(--abalone); border-radius: 8px; padding: 1rem; margin-top: 0.5rem;">
-                        <strong>{explain_ticker}</strong><br>
-                        Weight: {row['Weight %']:.2f}% (Benchmark: {eq_weight_pct:.2f}%)<br>
-                        AI View: {row['AI View']:.2%}<br>
-                        Equilibrium Return: {row['Equilibrium Return']:.2%}<br>
-                        Posterior Return: {row['Posterior Return']:.2%}<br>
-                        <span style="color: {'green' if diff>0 else 'red'}">{status} by {abs(diff):.2f}%</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                # τ Sensitivity Analysis with delay to avoid 429 errors
-                st.subheader("τ Sensitivity Analysis")
-                st.caption("How portfolio weights change as AI confidence (τ) increases")
-                if st.button("Run Sensitivity Analysis", key="sens_btn"):
-                    tau_values = [0.01, 0.025, 0.05, 0.075, 0.10]
-                    sensitivity_results = []
-                    progress = st.progress(0)
-                    for i, t in enumerate(tau_values):
-                        res = get_portfolio_data(t, risk, selected_date)
-                        if res:
-                            for ticker, w in zip(res['tickers'], res['weights_percent']):
-                                sensitivity_results.append({'tau': t, 'ticker': ticker, 'weight': w})
-                        # Delay to avoid rate limiting (429 error)
-                        time.sleep(0.3)
-                        progress.progress((i+1)/len(tau_values))
-                    if sensitivity_results:
-                        sens_df = pd.DataFrame(sensitivity_results)
-                        fig_sens = px.line(sens_df, x='tau', y='weight', color='ticker', markers=True,
-                                           title='Portfolio Weights vs AI Confidence (τ)',
-                                           labels={'tau': 'AI Confidence (τ)', 'weight': 'Weight (%)'})
-                        eq_weight_pct = 100 / len(df_weights)
-                        fig_sens.add_hline(y=eq_weight_pct, line_dash="dash", line_color="gray",
-                                           annotation_text=f"Equal Weight ({eq_weight_pct:.2f}%)")
-                        fig_sens.update_layout(xaxis_tickformat='.3f')
-                        st.plotly_chart(fig_sens, use_container_width=True)
-                        st.caption("As τ increases, the portfolio tilts more toward AI views and away from market equilibrium.")
-                
-                # Currency Crisis Simulator
-                st.subheader("Currency Crisis Wealth Simulator")
-                st.caption("Simulate how different portfolios preserve wealth during currency devaluation")
-                initial_usd = st.number_input("Initial Investment (USD)", min_value=100, max_value=100000, value=1000, step=100)
-                colA, colB, colC = st.columns(3)
-                with colA:
-                    ai_bl_final = initial_usd * 0.766
-                    st.markdown(f'<div class="metric-card"><h4>AI-BL Portfolio</h4><h2>${ai_bl_final:,.2f}</h2><p>76.6% preserved</p><p style="color:green">Best performer</p></div>', unsafe_allow_html=True)
-                with colB:
-                    eq_final = initial_usd * 0.636
-                    st.markdown(f'<div class="metric-card"><h4>Equal-Weight Portfolio</h4><h2>${eq_final:,.2f}</h2><p>63.6% preserved</p><p style="color:orange">Moderate loss</p></div>', unsafe_allow_html=True)
-                with colC:
-                    mkt_final = initial_usd * 0.000009
-                    st.markdown(f'<div class="metric-card"><h4>Market-Cap Portfolio</h4><h2>${mkt_final:,.4f}</h2><p>0.0009% preserved</p><p style="color:red">Near total loss</p></div>', unsafe_allow_html=True)
-            
-            with col2:
-                st.subheader("Portfolio Metrics")
-                st.metric("Expected Daily Return", f"{data['portfolio_return']:.4%}")
-                st.metric("Daily Volatility", f"{data['portfolio_volatility']:.4%}")
-                st.metric("Sharpe Ratio", f"{data['sharpe_ratio']:.2f}")
-    
-    # Black-Litterman explainability (always visible)
-    with st.expander("🔍 How the Black-Litterman model works here"):
-        st.markdown("""
-        **Step 1 – Market Equilibrium Prior (Π)**  
-        The model starts from market-cap weights as the collective market wisdom.
-        
-        **Step 2 – AI Views (Q)**  
-        CNN-LSTM forecasts (trained on DA-BERT sentiment and prices) become the views.
-        
-        **Step 3 – Bayesian Fusion**  
-        τ controls the weight given to AI views: low τ stays close to market, high τ tilts toward AI.
-        
-        **Step 4 – Optimization**  
-        Posterior returns are fed into a mean-variance optimizer (long-only, max Sharpe ratio).
-        """)
-        st.latex(r"E[R] = \left[(\tau\Sigma)^{-1} + P^\top\Omega^{-1}P\right]^{-1}\left[(\tau\Sigma)^{-1}\Pi + P^\top\Omega^{-1}Q\right]")
 
-# ---------------------------
-# Page 4: Stock Analysis
-# ---------------------------
+    st.markdown("""
+    <div class='page-header'>
+        <span class='page-header-title'>Portfolio Optimizer</span>
+        <span class='page-tag'>Black-Litterman · Live API</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_p1, col_p2, col_p3 = st.columns([2, 2, 1])
+    with col_p1:
+        tau = st.slider(
+            "τ — AI Confidence (higher = more trust in AI views)",
+            0.01, 0.10, 0.025, 0.005, format="%.3f"
+        )
+    with col_p2:
+        risk = st.slider(
+            "δ — Risk Aversion (higher = more conservative)",
+            1.0, 5.0, 2.5, 0.1, format="%.1f"
+        )
+    with col_p3:
+        if forecast_df is not None and not forecast_df.empty:
+            avail_dates = sorted(
+                forecast_df["date"].dt.strftime("%Y-%m-%d").unique()
+            )
+            sel_date = st.selectbox(
+                "Date", avail_dates, index=len(avail_dates) // 2
+            )
+        else:
+            sel_date = "2023-06-15"
+
+    run_btn = st.button("Run Black-Litterman Optimization →")
+
+    if run_btn:
+        with st.spinner("Calling Black-Litterman API…"):
+            data = get_portfolio_data(tau, risk, sel_date)
+
+        if data:
+            left, right = st.columns([3, 1])
+
+            with left:
+                df_w = pd.DataFrame({
+                    "Ticker":      data["tickers"],
+                    "Weight %":    [round(w, 3) for w in data["weights_percent"]],
+                    "AI View":     [round(v, 4) for v in data["ai_views"]],
+                    "Equilibrium": [round(e, 4) for e in data["equilibrium_returns"]],
+                    "Posterior":   [round(p, 4) for p in data["posterior_returns"]],
+                }).sort_values("Weight %", ascending=False)
+
+                EQ = 100 / len(df_w)
+                df_w["vs_eq"]  = (df_w["Weight %"] - EQ).round(3)
+                df_w["Status"] = df_w["vs_eq"].apply(
+                    lambda x: "OVERWEIGHT" if x > 0 else "UNDERWEIGHT"
+                )
+                bar_colors = [
+                    "#3A7D5B" if x > 0 else "#8B3A3A"
+                    for x in df_w["vs_eq"]
+                ]
+
+                fig_w = go.Figure(go.Bar(
+                    x=df_w["Ticker"], y=df_w["Weight %"],
+                    marker_color=bar_colors,
+                    text=df_w["Weight %"].apply(lambda x: f"{x:.1f}%"),
+                    textposition="outside",
+                    textfont=dict(family="DM Mono", size=10, color="#6C7A8E"),
+                ))
+                fig_w.add_hline(
+                    y=EQ, line_dash="dot", line_color="#8E9AAB",
+                    annotation_text=f"Equal weight {EQ:.2f}%",
+                    annotation_font=dict(color="#8E9AAB", size=10),
+                )
+                fig_w.update_layout(
+                    title=dict(
+                        text=f"Optimal Weights  ·  τ={tau:.3f}  ·  δ={risk:.1f}",
+                        font=dict(family="DM Sans", size=14, color="#3A4556")
+                    ),
+                    showlegend=False,
+                    **make_plot_layout()
+                )
+                st.plotly_chart(fig_w, use_container_width=True)
+
+                st.markdown("<h2>Allocation Breakdown</h2>",
+                            unsafe_allow_html=True)
+                df_w["Explanation"] = df_w.apply(
+                    lambda r: (
+                        f"AI view {r['AI View']:.2%} vs "
+                        f"equilibrium {r['Equilibrium']:.2%} → "
+                        f"posterior {r['Posterior']:.2%}"
+                    ), axis=1
+                )
+                st.dataframe(
+                    df_w[["Ticker","Weight %","vs_eq","Status","Explanation"]],
+                    use_container_width=True,
+                )
+
+                with st.expander(
+                    "τ Sensitivity — how weights change with AI confidence"
+                ):
+                    tau_vals = [0.01, 0.025, 0.05, 0.075, 0.10]
+                    sens = []
+                    prog = st.progress(0)
+                    for i, t in enumerate(tau_vals):
+                        r = get_portfolio_data(t, risk, sel_date)
+                        if r:
+                            for tick, w in zip(
+                                r["tickers"], r["weights_percent"]
+                            ):
+                                sens.append({
+                                    "τ": t, "Ticker": tick,
+                                    "Weight %": round(w, 3)
+                                })
+                        prog.progress((i + 1) / len(tau_vals))
+                        time.sleep(1)
+
+                    if sens:
+                        sf = pd.DataFrame(sens)
+                        fig_s = px.line(
+                            sf, x="τ", y="Weight %", color="Ticker",
+                            title="Portfolio Weights vs AI Confidence (τ)",
+                            color_discrete_sequence=[
+                                "#4E5B6E","#8E9AAB","#3A7D5B","#8B3A3A",
+                                "#6C7A8E","#B8C2D0","#3A4556","#5D6A7A","#A8B2C0"
+                            ]
+                        )
+                        fig_s.add_hline(
+                            y=EQ, line_dash="dot", line_color="#8E9AAB",
+                            annotation_text="Equal weight",
+                            annotation_font=dict(color="#8E9AAB", size=10),
+                        )
+                        fig_s.update_layout(**make_plot_layout())
+                        st.plotly_chart(fig_s, use_container_width=True)
+                        st.caption(
+                            "Steeper lines = stocks where AI views diverge "
+                            "more from market equilibrium."
+                        )
+
+                with st.expander("Black-Litterman posterior formula"):
+                    st.latex(
+                        r"E[R]=\left[(\tau\Sigma)^{-1}+P^\top\Omega^{-1}P"
+                        r"\right]^{-1}\left[(\tau\Sigma)^{-1}\Pi+"
+                        r"P^\top\Omega^{-1}Q\right]"
+                    )
+                    st.markdown("""
+                    | Symbol | Meaning |
+                    |--------|---------|
+                    | Π | Market equilibrium returns (CAPM reverse-optimisation) |
+                    | Q | CNN-LSTM return forecasts (AI views) |
+                    | Σ | Historical covariance matrix |
+                    | Ω | Diagonal view uncertainty (validation errors) |
+                    | τ | Confidence scalar (your slider) |
+                    | P | Identity matrix (absolute views, one per asset) |
+                    """)
+
+            with right:
+                st.markdown("<h2>Metrics</h2>", unsafe_allow_html=True)
+                st.metric("Expected Return",
+                          f"{data['portfolio_return']:.4%}")
+                st.metric("Daily Volatility",
+                          f"{data['portfolio_volatility']:.4%}")
+                st.metric("Sharpe Ratio",
+                          f"{data['sharpe_ratio']:.2f}")
+
+                st.markdown("---")
+                st.markdown("<h2>Backtest (2023–2024)</h2>",
+                            unsafe_allow_html=True)
+                st.metric("AI-BL Final Wealth",  "25.84 ZiG", "+20.4% vs EW")
+                st.metric("Equal-Weight Wealth", "21.47 ZiG")
+                st.metric("Market-Cap Wealth",   "0.0003 ZiG", "-99.99%")
+
+                st.markdown("---")
+                st.markdown("<h2>USD Preservation</h2>",
+                            unsafe_allow_html=True)
+                inv = st.number_input(
+                    "Initial investment (USD)",
+                    min_value=100, max_value=100000,
+                    value=1000, step=100
+                )
+                st.markdown(f"""
+                <div style='margin-top:0.8rem'>
+                    <div class='overline'>AI-BL Portfolio</div>
+                    <div style='font-family:Playfair Display,serif;
+                                font-size:1.5rem;font-weight:700;
+                                color:#3A7D5B'>${inv*0.766:,.2f}</div>
+                    <div style='font-size:0.72rem;color:#8E9AAB;
+                                margin-bottom:0.9rem'>76.6% preserved</div>
+                    <div class='overline'>Equal-Weight</div>
+                    <div style='font-family:Playfair Display,serif;
+                                font-size:1.5rem;font-weight:700;
+                                color:#4E5B6E'>${inv*0.636:,.2f}</div>
+                    <div style='font-size:0.72rem;color:#8E9AAB;
+                                margin-bottom:0.9rem'>63.6% preserved</div>
+                    <div class='overline'>Market-Cap</div>
+                    <div style='font-family:Playfair Display,serif;
+                                font-size:1.5rem;font-weight:700;
+                                color:#8B3A3A'>${inv*0.000009:,.4f}</div>
+                    <div style='font-size:0.72rem;color:#8E9AAB'>
+                        0.0009% preserved
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+#  PAGE 3  —  STOCK ANALYSIS
+# ─────────────────────────────────────────────
 elif page == "📈 Stock Analysis":
-    st.header("Stock Analysis")
+
+    st.markdown("""
+    <div class='page-header'>
+        <span class='page-header-title'>Stock Analysis</span>
+        <span class='page-tag'>Fundamentals · AI Signals · Forecasts</span>
+    </div>
+    """, unsafe_allow_html=True)
+
     if news_df.empty:
-        st.error("No news data available.")
+        st.warning("No news data loaded.")
         st.stop()
-    all_tickers = sorted(news_df["ticker"].unique())
-    selected_ticker = st.selectbox("Select Stock", all_tickers)
-    all_dates = sorted(news_df["date"].unique())
-    selected_date = st.selectbox("Select Date", all_dates)
-    
-    st.subheader("Fundamentals")
+
+    col_s1, col_s2 = st.columns(2)
+    selected_ticker  = col_s1.selectbox(
+        "Select stock", sorted(news_df["ticker"].unique())
+    )
+    all_dates_sa     = sorted(news_df["date"].unique())
+    selected_date_sa = col_s2.selectbox("Select date", all_dates_sa)
+
+    # ── fundamentals ──
+    st.markdown("<h2>Fundamentals</h2>", unsafe_allow_html=True)
     if fund_df is not None and not fund_df.empty:
         fund = fund_df[fund_df["ticker"] == selected_ticker]
         if not fund.empty:
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("P/B Ratio", f"{fund['P/B'].values[0]:.2f}" if 'P/B' in fund else "N/A")
-                st.metric("ROE", f"{fund['ROE'].values[0]:.1%}" if 'ROE' in fund else "N/A")
-            with col2:
-                st.metric("Net Margin", f"{fund['Net Margin'].values[0]:.1%}" if 'Net Margin' in fund else "N/A")
-                st.metric("Dividend Yield", f"{fund['Dividend Yield'].values[0]:.1%}" if 'Dividend Yield' in fund else "N/A")
-            with col3:
-                st.metric("Market Cap (ZiG mn)", f"{fund['Market Cap (ZiG mn)'].values[0]:,.0f}" if 'Market Cap (ZiG mn)' in fund else "N/A")
-            with col4:
-                st.metric("P/E Ratio", f"{fund['P/E'].values[0]:.2f}" if 'P/E' in fund else "N/A")
+            f    = fund.iloc[0]
+            cols = st.columns(6)
+            fields = [
+                ("P/B","P/B"),("ROE","ROE"),("Net Margin","Net Margin"),
+                ("Dividend Yield","Dividend Yield"),
+                ("Market Cap (ZiG mn)","Market Cap (ZiG mn)"),
+                ("P/E","P/E"),
+            ]
+            for col_obj, (label, key) in zip(cols, fields):
+                raw = f.get(key, "N/A")
+                if isinstance(raw, float):
+                    if key in ("ROE","Net Margin","Dividend Yield"):
+                        display = f"{raw:.1%}"
+                    elif key == "Market Cap (ZiG mn)":
+                        display = f"{raw:,.0f}"
+                    else:
+                        display = f"{raw:.2f}"
+                else:
+                    display = str(raw)
+                col_obj.metric(label, display)
         else:
-            st.info("No fundamentals for this ticker.")
+            st.info("No fundamentals available for this ticker.")
     else:
         st.info("Fundamentals file not loaded.")
-    
-    st.subheader("AI Signals")
-    news_sent = news_df[(news_df["ticker"] == selected_ticker) & (news_df["date"] == selected_date)]
-    sentiment_score = news_sent["sentiment_score"].iloc[0] if not news_sent.empty else None
-    sentiment_label = news_sent["sentiment_label"].iloc[0] if not news_sent.empty else "N/A"
+
+    # ── AI signals ──
+    st.markdown("<h2>AI Signals</h2>", unsafe_allow_html=True)
+    news_s = news_df[
+        (news_df["ticker"] == selected_ticker) &
+        (news_df["date"]   == selected_date_sa)
+    ]
+    sent_score = news_s["sentiment_score"].iloc[0] if not news_s.empty else None
+    sent_label = news_s["sentiment_label"].iloc[0]  if not news_s.empty else "N/A"
+
+    fc_row = pd.DataFrame()
     if forecast_df is not None and not forecast_df.empty:
-        forecast = forecast_df[(forecast_df["ticker"] == selected_ticker) & (forecast_df["date"] == selected_date)]
-        ai_view = forecast["predicted_return"].iloc[0] if not forecast.empty else None
-    else:
-        ai_view = None
-    api_data = get_portfolio_data(0.025, 2.5, selected_date.strftime("%Y-%m-%d"))
-    if api_data:
+        fc_row = forecast_df[
+            (forecast_df["ticker"] == selected_ticker) &
+            (forecast_df["date"]   == selected_date_sa)
+        ]
+    ai_view = fc_row["predicted_return"].iloc[0] if not fc_row.empty else None
+
+    # single API call with graceful fallback
+    date_str_sa = (
+        selected_date_sa.strftime("%Y-%m-%d")
+        if hasattr(selected_date_sa, "strftime")
+        else str(selected_date_sa)[:10]
+    )
+    api_d   = get_portfolio_data(0.025, 2.5, date_str_sa)
+    ai_bl_w = vs_eq = None
+    if api_d:
         try:
-            idx = api_data["tickers"].index(selected_ticker)
-            ai_bl_weight = api_data["weights_percent"][idx]
-            eq_weight = 100 / len(api_data["tickers"])
-            vs_eq = ai_bl_weight - eq_weight
-        except ValueError:
-            ai_bl_weight = None
-            vs_eq = None
-    else:
-        ai_bl_weight = None
-        vs_eq = None
-    
-    colA, colB, colC = st.columns(3)
-    with colA:
-        st.metric("Sentiment Score", f"{sentiment_score:.3f}" if sentiment_score is not None else "N/A")
-        st.caption(f"Label: {sentiment_label}")
-    with colB:
-        st.metric("AI View (Predicted Return)", f"{ai_view:.2%}" if ai_view else "N/A")
-    with colC:
-        if ai_bl_weight is not None:
-            st.metric("AI-BL Weight", f"{ai_bl_weight:.2f}%")
-            st.metric("vs Equal Weight", f"{vs_eq:+.2f}%")
-        else:
-            st.metric("AI-BL Weight", "N/A")
-    
-    st.subheader("Price & Sentiment Over Time")
+            idx     = api_d["tickers"].index(selected_ticker)
+            ai_bl_w = api_d["weights_percent"][idx]
+            vs_eq   = ai_bl_w - 100 / len(api_d["tickers"])
+        except (ValueError, KeyError):
+            pass
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(
+        "Sentiment Score",
+        f"{float(sent_score):.3f}" if sent_score is not None else "N/A",
+        str(sent_label),
+    )
+    c2.metric(
+        "AI View (CNN-LSTM)",
+        f"{float(ai_view):.2%}" if ai_view is not None else "N/A",
+    )
+    c3.metric(
+        "AI-BL Weight",
+        f"{ai_bl_w:.2f}%" if ai_bl_w is not None else "N/A",
+    )
+    c4.metric(
+        "vs Equal Weight",
+        f"{vs_eq:+.2f}%" if vs_eq is not None else "N/A",
+    )
+
+    # ── price & sentiment  (yaxis2 passed via make_plot_layout) ──
+    st.markdown("<h2>Price & Sentiment Over Time</h2>", unsafe_allow_html=True)
     if prices_long is not None and not prices_long.empty:
-        stock_prices = prices_long[prices_long["ticker"] == selected_ticker].copy()
-        stock_sentiment = news_df[news_df["ticker"] == selected_ticker].copy()
-        if not stock_prices.empty and not stock_sentiment.empty:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=stock_prices["Date"], y=stock_prices["price"], name="Price", yaxis="y1"))
-            fig.add_trace(go.Scatter(x=stock_sentiment["date"], y=stock_sentiment["sentiment_score"], name="Sentiment", yaxis="y2"))
-            fig.update_layout(
-                title="Price and Sentiment",
-                yaxis=dict(title="Price (ZiG)", side="left"),
-                yaxis2=dict(title="Sentiment", overlaying="y", side="right", range=[-1,1])
+        sp = prices_long[prices_long["ticker"] == selected_ticker].copy()
+        ss = news_df[news_df["ticker"] == selected_ticker].copy()
+        if not sp.empty and not ss.empty:
+            fig_ps = go.Figure()
+            fig_ps.add_trace(go.Scatter(
+                x=sp["Date"], y=sp["price"],
+                name="Price",
+                line=dict(color="#4E5B6E", width=1.8),
+                yaxis="y",
+            ))
+            fig_ps.add_trace(go.Scatter(
+                x=ss["date"], y=ss["sentiment_score"],
+                name="Sentiment",
+                line=dict(color="#8E9AAB", width=1.2, dash="dot"),
+                yaxis="y2",
+            ))
+            fig_ps.update_layout(
+                title=dict(
+                    text=f"{selected_ticker} — Price vs Sentiment",
+                    font=dict(family="DM Sans", size=14, color="#3A4556")
+                ),
+                # pass yaxis2 through the helper's **extra mechanism
+                **make_plot_layout(
+                    yaxis2=dict(
+                        title="Sentiment",
+                        overlaying="y",
+                        side="right",
+                        range=[-1, 1],
+                        gridcolor="#D9E0E8",
+                        tickfont=dict(color="#8E9AAB"),
+                    )
+                )
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig_ps, use_container_width=True)
         else:
-            st.warning("Insufficient price or sentiment data for this ticker.")
+            st.warning(
+                "Insufficient price or sentiment data for this ticker."
+            )
     else:
-        st.warning("Price data not available.")
-    
-    st.subheader("AI Forecast vs Actual Returns")
+        st.warning("Price data not loaded.")
+
+    # ── forecast vs actual ──
+    st.markdown("<h2>CNN-LSTM Forecast vs Actual Returns</h2>",
+                unsafe_allow_html=True)
     if forecast_df is not None and not forecast_df.empty:
-        stock_forecasts = forecast_df[forecast_df["ticker"] == selected_ticker].copy()
-        if not stock_forecasts.empty:
-            fig2 = go.Figure()
-            fig2.add_trace(go.Scatter(x=stock_forecasts["date"], y=stock_forecasts["predicted_return"], name="Predicted", mode="lines+markers"))
-            fig2.add_trace(go.Scatter(x=stock_forecasts["date"], y=stock_forecasts["actual_return"], name="Actual", mode="lines+markers"))
-            fig2.update_layout(title="Forecast vs Actual Returns", xaxis_title="Date", yaxis_title="Return")
-            st.plotly_chart(fig2, use_container_width=True)
+        sf = forecast_df[forecast_df["ticker"] == selected_ticker].copy()
+        if not sf.empty:
+            fig_f = go.Figure()
+            fig_f.add_trace(go.Scatter(
+                x=sf["date"], y=sf["predicted_return"],
+                name="Predicted",
+                line=dict(color="#4E5B6E", width=1.8),
+            ))
+            fig_f.add_trace(go.Scatter(
+                x=sf["date"], y=sf["actual_return"],
+                name="Actual",
+                line=dict(color="#8E9AAB", width=1.2),
+            ))
+            fig_f.update_layout(
+                title=dict(
+                    text="CNN-LSTM Forecast vs Actual Returns",
+                    font=dict(family="DM Sans", size=14, color="#3A4556")
+                ),
+                **make_plot_layout()
+            )
+            st.plotly_chart(fig_f, use_container_width=True)
+            st.caption(
+                "Directional accuracy: 34.47% — consistent with "
+                "high-volatility frontier market literature."
+            )
         else:
-            st.info("No forecast data for this ticker.")
+            st.info("No forecast data available for this ticker.")
     else:
         st.info("Forecast file not loaded.")
 
-# ---------------------------
-# Page 5: Live News Feed
-# ---------------------------
+
+# ─────────────────────────────────────────────
+#  PAGE 4  —  LIVE NEWS FEED
+# ─────────────────────────────────────────────
 elif page == "📰 Live News Feed":
-    st.header("Live News Feed")
-    st.markdown("Latest financial news from Zimbabwe, **filtered for the 9 companies** and **only articles from 2025 onwards**.")
-    
-    rss_url = st.text_input("RSS feed URL", value="https://www.herald.co.zw/feed/")
+
+    st.markdown("""
+    <div class='page-header'>
+        <span class='page-header-title'>Live News Feed</span>
+        <span class='page-tag'>RSS · Filtered for 9 Holdings</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    rss_url = st.text_input(
+        "RSS feed URL",
+        value="https://www.herald.co.zw/feed/"
+    )
+
     if st.button("Fetch News"):
-        with st.spinner("Fetching latest news..."):
+        with st.spinner("Fetching latest articles…"):
             entries = fetch_rss_feed(rss_url)
-        
+
         if entries:
-            for entry in entries:
-                st.markdown(f"### [{entry['title']}]({entry['link']})")
-                st.caption(f"Published: {entry['published']}")
-                st.write(entry['summary'])
-                st.divider()
+            st.markdown(
+                f"<div class='badge badge-iron'>"
+                f"{len(entries)} relevant articles found"
+                f"</div><br><br>",
+                unsafe_allow_html=True
+            )
+            for e in entries:
+                st.markdown(f"""
+                <div class='news-item'>
+                    <div class='news-headline'>
+                        <a href='{e["link"]}'
+                           style='color:#3A4556;text-decoration:none'>
+                            {e["title"]}
+                        </a>
+                    </div>
+                    <div class='news-meta'>{e["published"]}</div>
+                    <div class='news-body'>{e["summary"]}</div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.warning("No relevant news from 2025 onwards found for the 9 companies. Try another RSS feed.")
+            st.warning(
+                "No relevant articles found for the 9 holdings. "
+                "The feed may not contain recent ZSE-related news."
+            )
+
+    st.markdown("---")
+    st.markdown("""
+    <div style='font-family:DM Mono,monospace;font-size:0.62rem;
+                color:#A8B2C0;line-height:1.9'>
+    Filtered keywords: AFDIS · African Distillers · BAT · British American
+    Tobacco · CAFCA · CBZ · Delta · Dairibord · Econet · OK Zimbabwe · Seed Co
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
+#  PAGE 5  —  USER GUIDE
+# ─────────────────────────────────────────────
+elif page == "📘 User Guide":
+
+    st.markdown("""
+    <div class='page-header'>
+        <span class='page-header-title'>User Guide</span>
+        <span class='page-tag'>How to use this system</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    guides = [
+        ("📊","Market Intelligence","DA-BERT Sentiment",
+         "Upload a news CSV or use the default dataset. Select a trading date "
+         "to see sentiment scores per stock, the market-wide trend, and "
+         "individual news articles with DA-BERT labels, scores, and confidence. "
+         "The change table compares today's sentiment to the previous news date."),
+        ("⚙️","Portfolio Optimizer","Black-Litterman · Live API",
+         "Adjust τ (AI confidence: 0.01 = near-market-equilibrium, "
+         "0.10 = high AI trust) and δ (risk aversion 1–5). Select an "
+         "optimization date. Click Run Optimization to call the live FastAPI "
+         "backend. Weights, explanations, and metrics are returned dynamically. "
+         "The τ Sensitivity panel proves the mathematics changes with your input."),
+        ("📈","Stock Analysis","Fundamentals · AI Signals",
+         "Select a stock and date. View fundamentals (P/B, ROE, Net Margin, "
+         "Dividend Yield, Market Cap, P/E), AI signals (sentiment score, "
+         "CNN-LSTM predicted return, AI-BL weight vs equal weight), "
+         "price vs sentiment dual-axis chart, and CNN-LSTM forecast vs "
+         "actual returns over the full test period."),
+        ("📰","Live News Feed","RSS · Auto-filtered",
+         "Enter any RSS feed URL (default: The Herald). The system filters "
+         "to show only articles mentioning the 9 portfolio companies — "
+         "demonstrating the news pipeline that feeds the DA-BERT model."),
+        ("💾","Upload Your Data","CSV Override",
+         "On the Market Intelligence page, upload your own news CSV. "
+         "The system immediately adapts. Required columns: date, ticker, "
+         "headline, content, sentiment_score, sentiment_label, "
+         "source, confidence."),
+    ]
+
+    for icon, title, tag, desc in guides:
+        st.markdown(f"""
+        <div class='guide-card'>
+            <div style='display:flex;align-items:center;
+                        gap:10px;margin-bottom:0.6rem'>
+                <span style='font-size:1.1rem'>{icon}</span>
+                <span style='font-family:DM Sans,sans-serif;font-size:0.93rem;
+                             font-weight:600;color:#3A4556'>{title}</span>
+                <span class='badge badge-iron'>{tag}</span>
+            </div>
+            <p style='font-size:0.8rem;color:#6C7A8E;
+                      line-height:1.75;margin:0'>{desc}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("""
+    <div style='font-family:DM Mono,monospace;font-size:0.61rem;
+                color:#A8B2C0;line-height:2'>
+    DA-BERT fine-tuned on 8,465 Zimbabwean news articles · accuracy 81.4% · F1 0.79<br>
+    CNN-LSTM directional accuracy 34.47% · MAE 5.88% · frontier market baseline<br>
+    Black-Litterman posterior: τΣ prior + Ω view uncertainty · long-only · max Sharpe<br>
+    Backend: FastAPI on Render · Sources: ZSE, The Herald, NewsDay, Zimbabwe Independent
+    </div>
+    """, unsafe_allow_html=True)
