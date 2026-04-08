@@ -612,8 +612,3 @@ elif page == "📰 Live News Feed":
             else:
                 st.error("No relevant entries from 2025 onwards found.")
 
-
-# At the very end of the file, add these lines
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8501))
-    st.run(port=port)
