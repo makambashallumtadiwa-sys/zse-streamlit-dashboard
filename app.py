@@ -639,91 +639,103 @@ if page == "🏠 Home":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── User role cards ──
-    st.markdown("""
-    <div class='role-grid'>
+    # ── User role cards — using st.columns so Streamlit renders HTML correctly ──
+    roles = [
+        (
+            "💼", "Investor",
+            "See how each company is performing, check AI sentiment signals, "
+            "and explore how much of your wealth would have been preserved "
+            "during Zimbabwe's currency crisis.",
+            ["→ Portfolio Optimizer", "→ Stock Analysis"],
+        ),
+        (
+            "📊", "Stockbroker",
+            "Monitor daily sentiment trends across all nine counters, track "
+            "which stocks are seeing improving or declining news coverage, "
+            "and stay on top of live headlines.",
+            ["→ Market Intelligence", "→ Live News Feed"],
+        ),
+        (
+            "🔬", "Analyst",
+            "Run the Black-Litterman optimizer with different confidence "
+            "levels, examine how AI views compare to market equilibrium, "
+            "and review CNN-LSTM forecast accuracy stock by stock.",
+            ["→ Portfolio Optimizer", "→ Stock Analysis"],
+        ),
+        (
+            "🏦", "Fund Manager",
+            "Upload your own news dataset and see how the sentiment model "
+            "adapts. Adjust risk parameters and compare AI-driven weights "
+            "against equal-weight and market-cap benchmarks.",
+            ["→ Portfolio Optimizer", "→ Market Intelligence"],
+        ),
+    ]
 
-        <div class='role-card'>
-            <span class='role-icon'>💼</span>
-            <div class='role-title'>Investor</div>
-            <div class='role-desc'>
-                See how each company is performing, check AI sentiment
-                signals, and explore how much of your wealth would have
-                been preserved during Zimbabwe's currency crisis.
+    r1, r2, r3, r4 = st.columns(4, gap="small")
+    for col, (icon, title, desc, links) in zip([r1, r2, r3, r4], roles):
+        link_html = "".join(
+            f"<div style='font-family:DM Mono,monospace;font-size:0.63rem;"
+            f"color:#4E5B6E;background:#D9E0E8;border:1px solid #B8C2D0;"
+            f"border-radius:20px;padding:2px 10px;display:inline-block;"
+            f"margin-top:5px;margin-right:4px;letter-spacing:0.05em'>"
+            f"{lnk}</div>"
+            for lnk in links
+        )
+        col.markdown(
+            f"""
+            <div style='background:#FFFFFF;border:1px solid #D9E0E8;
+                        border-radius:12px;padding:1.3rem 1.1rem 1.1rem;
+                        height:100%;min-height:200px'>
+                <div style='font-size:2rem;margin-bottom:0.5rem'>{icon}</div>
+                <div style='font-family:DM Sans,sans-serif;font-size:0.92rem;
+                            font-weight:600;color:#3A4556;
+                            margin-bottom:0.5rem'>{title}</div>
+                <div style='font-size:0.76rem;color:#6C7A8E;
+                            line-height:1.65;margin-bottom:0.6rem'>{desc}</div>
+                {link_html}
             </div>
-            <span class='role-link'>→ Portfolio Optimizer</span>
-            <span class='role-link' style='margin-top:4px'>→ Stock Analysis</span>
-        </div>
-
-        <div class='role-card'>
-            <span class='role-icon'>📊</span>
-            <div class='role-title'>Stockbroker</div>
-            <div class='role-desc'>
-                Monitor daily sentiment trends across all nine counters,
-                track which stocks are seeing improving or declining news
-                coverage, and stay on top of live headlines.
-            </div>
-            <span class='role-link'>→ Market Intelligence</span>
-            <span class='role-link' style='margin-top:4px'>→ Live News Feed</span>
-        </div>
-
-        <div class='role-card'>
-            <span class='role-icon'>🔬</span>
-            <div class='role-title'>Analyst</div>
-            <div class='role-desc'>
-                Run the Black-Litterman optimizer with different confidence
-                levels, examine how AI views compare to market equilibrium,
-                and review CNN-LSTM forecast accuracy stock by stock.
-            </div>
-            <span class='role-link'>→ Portfolio Optimizer</span>
-            <span class='role-link' style='margin-top:4px'>→ Stock Analysis</span>
-        </div>
-
-        <div class='role-card'>
-            <span class='role-icon'>🏦</span>
-            <div class='role-title'>Fund Manager</div>
-            <div class='role-desc'>
-                Upload your own news dataset and see how the sentiment
-                model adapts. Adjust risk parameters and compare AI-driven
-                weights against equal-weight and market-cap benchmarks.
-            </div>
-            <span class='role-link'>→ Portfolio Optimizer</span>
-            <span class='role-link' style='margin-top:4px'>→ Market Intelligence</span>
-        </div>
-
-    </div>
-    """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
 
-    # ── Quick start strip ──
-    st.markdown("""
-    <div style='background:var(--white);border:1px solid var(--abalone);
-                border-radius:10px;padding:1.1rem 1.5rem'>
-        <div style='font-family:DM Mono,monospace;font-size:0.62rem;
-                    color:var(--fossil);text-transform:uppercase;
-                    letter-spacing:0.1em;margin-bottom:0.8rem'>
-            Quick Start
-        </div>
-        <div style='display:grid;grid-template-columns:repeat(3,1fr);gap:10px'>
-            <div style='font-size:0.8rem;color:var(--trout);line-height:1.7'>
-                <span style='font-weight:600;color:var(--iron)'>Step 1</span><br>
-                Go to <b>Market Intelligence</b> and pick a date to see
-                what the news sentiment looked like on that day.
+    # ── Quick start — st.columns so grid renders correctly ──
+    st.markdown(
+        "<div style='font-family:DM Mono,monospace;font-size:0.62rem;"
+        "color:#8E9AAB;text-transform:uppercase;letter-spacing:0.1em;"
+        "margin-bottom:0.7rem'>Quick Start</div>",
+        unsafe_allow_html=True,
+    )
+    qs1, qs2, qs3 = st.columns(3, gap="medium")
+    steps = [
+        ("Step 1", "Market Intelligence",
+         "Pick a trading date and explore what news sentiment "
+         "looked like across all nine ZSE counters on that day."),
+        ("Step 2", "Portfolio Optimizer",
+         "Adjust the τ slider and click Run to get live "
+         "AI-driven Black-Litterman portfolio weights instantly."),
+        ("Step 3", "Stock Analysis",
+         "Select any of the nine counters to see fundamentals, "
+         "AI signals, and CNN-LSTM forecast accuracy side by side."),
+    ]
+    for col, (label, page_name, text) in zip([qs1, qs2, qs3], steps):
+        col.markdown(
+            f"""
+            <div style='background:#FFFFFF;border:1px solid #D9E0E8;
+                        border-radius:10px;padding:1rem 1.1rem'>
+                <div style='font-family:DM Mono,monospace;font-size:0.62rem;
+                            color:#4E5B6E;font-weight:500;
+                            margin-bottom:0.3rem'>{label}</div>
+                <div style='font-family:DM Sans,sans-serif;font-size:0.85rem;
+                            font-weight:600;color:#3A4556;
+                            margin-bottom:0.3rem'>{page_name}</div>
+                <div style='font-size:0.78rem;color:#6C7A8E;
+                            line-height:1.65'>{text}</div>
             </div>
-            <div style='font-size:0.8rem;color:var(--trout);line-height:1.7'>
-                <span style='font-weight:600;color:var(--iron)'>Step 2</span><br>
-                Open <b>Portfolio Optimizer</b>, adjust the τ slider,
-                and click Run to get live AI-driven portfolio weights.
-            </div>
-            <div style='font-size:0.8rem;color:var(--trout);line-height:1.7'>
-                <span style='font-weight:600;color:var(--iron)'>Step 3</span><br>
-                Visit <b>Stock Analysis</b> to drill into any of the
-                nine counters and see fundamentals alongside AI signals.
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 # ─────────────────────────────────────────────
